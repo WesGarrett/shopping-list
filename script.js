@@ -1,15 +1,18 @@
-// 1) declare const for itemForm, itemInput, and itemList and add event listsener to the itemForm for submit. It will run the addItem function.
-// 2) Create a funtion called addItem with a event object. call prevent default. Add validation for the itemInput using and if statment and an alert.
-// 3) Create the list item 'listItem' by declaring a const li and using createElement and then creating a textnode
-// 4) Create a new funtion called createButton that takes in classes. Inside the function create the button element, set the class of the button to "classes", then return the button.
-// 5) Create a new funtion called createIcon that takes in classes. Inside the function create the icon element using an 'i' tag, set the classname to "classes", the return the icon. Then create a const of the icon funtion in the button function. Then append the icon to the button.
-// 6) Back in the addItem function, append the button to the li then append the li to the DOM (itemList). Then clear the item input
-
 const itemForm = document.getElementById('item-form');
 const itemInput = document.getElementById('item-input');
 const itemList = document.getElementById('item-list');
+const clearBtn = document.getElementById('clear');
+const itemFilter = document.getElementById('filter');
+let isEditMode = false;
+const formBtn = document.querySelector('button');
 
-function addItem(e) {
+function displayItems() {
+	const itemsFromStorage = getItemsFromStorage();
+	itemsFromStorage.forEach((item) => addItemToDom(item));
+	checkUI();
+}
+
+function onAddItemSubmit(e) {
 	e.preventDefault();
 
 	const newItem = itemInput.value;
@@ -18,18 +21,56 @@ function addItem(e) {
 		alert('Please enter an item.');
 		return;
 	}
-
-	// Capitalize the first letter of the item
 	const capitalizedItem = newItem.charAt(0).toUpperCase() + newItem.slice(1);
 
+	if (isEditMode) {
+		const itemToEdit = itemList.querySelector('.edit-mode');
+
+		removeItemFromStorage(itemToEdit.textContent);
+		itemToEdit.classList.remove('edit-mode');
+		itemToEdit.remove();
+		isEditMode = false;
+	} else {
+		if (checkIfItemExists(capitalizedItem)) {
+			alert(`The item "${capitalizedItem}" already exists!`);
+			return;
+		}
+	}
+
+	addItemToDom(capitalizedItem);
+	addItemsToStorage(capitalizedItem);
+	checkUI();
+
+	itemInput.value = '';
+}
+
+function addItemToDom(item) {
 	const li = document.createElement('li');
-	li.appendChild(document.createTextNode(capitalizedItem));
+	li.appendChild(document.createTextNode(item));
 
 	const button = createButton('remove-item btn-link text-red');
 	li.appendChild(button);
 	itemList.appendChild(li);
+}
 
-	itemInput.value = '';
+function addItemsToStorage(item) {
+	const itemsFromStorage = getItemsFromStorage();
+
+	itemsFromStorage.push(item);
+
+	localStorage.setItem('items', JSON.stringify(itemsFromStorage));
+}
+
+function getItemsFromStorage() {
+	let itemsFromStorage;
+
+	if (localStorage.getItem('items') === null) {
+		itemsFromStorage = [];
+	} else {
+		itemsFromStorage = JSON.parse(localStorage.getItem('items'));
+	}
+
+	return itemsFromStorage;
 }
 
 function createButton(classes) {
@@ -46,4 +87,100 @@ function createIcon(classes) {
 	return icon;
 }
 
-itemForm.addEventListener('submit', addItem);
+function onClickItem(e) {
+	if (e.target.parentElement.classList.contains('remove-item')) {
+		removeItem(e.target.parentElement.parentElement);
+	} else {
+		setItemToEdit(e.target);
+	}
+}
+
+function removeItem(item) {
+	if (confirm('Are you sure?')) {
+		item.remove();
+
+		removeItemFromStorage(item.textContent);
+
+		checkUI();
+	}
+}
+
+function removeItemFromStorage(item) {
+	let itemsFromStorage = getItemsFromStorage();
+
+	// Filter out item to be removed
+	itemsFromStorage = itemsFromStorage.filter((i) => i !== item);
+
+	// Re-set to localstorage
+	localStorage.setItem('items', JSON.stringify(itemsFromStorage));
+}
+
+function clearItems() {
+	while (itemList.firstChild) {
+		itemList.removeChild(itemList.firstChild);
+	}
+
+	localStorage.removeItem('items');
+	checkUI();
+}
+
+function filterItems(e) {
+	const items = itemList.querySelectorAll('li');
+	const text = e.target.value.toLowerCase();
+
+	items.forEach((item) => {
+		const itemName = item.firstChild.textContent.toLowerCase();
+
+		if (itemName.indexOf(text) != -1) {
+			item.style.display = 'flex';
+		} else {
+			item.style.display = 'none';
+		}
+	});
+}
+function checkUI() {
+	const items = itemList.querySelectorAll('li');
+
+	if (items.length === 0) {
+		clearBtn.style.display = 'none';
+		filter.style.display = 'none';
+	} else {
+		clearBtn.style.display = 'block';
+		itemFilter.style.display = 'block';
+	}
+
+	isEditMode = false;
+	formBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Item';
+	formBtn.style.backgroundColor = '#333';
+}
+
+function setItemToEdit(item) {
+	isEditMode = true;
+
+	itemList
+		.querySelectorAll('li')
+		.forEach((i) => i.classList.remove('edit-mode'));
+
+	item.classList.add('edit-mode');
+	formBtn.innerHTML = '<i class="fa-solid fa-pen"></i>   Update Item';
+	formBtn.style.backgroundColor = '#228B22';
+	itemInput.value = item.textContent;
+}
+
+function checkIfItemExists(item) {
+	const itemsFromStorage = getItemsFromStorage();
+	return itemsFromStorage.includes(item);
+}
+
+function init() {
+	// Event Listeners
+
+	itemForm.addEventListener('submit', onAddItemSubmit);
+	itemList.addEventListener('click', onClickItem);
+	clearBtn.addEventListener('click', clearItems);
+	itemFilter.addEventListener('input', filterItems);
+	document.addEventListener('DOMContentLoaded', displayItems);
+	checkUI();
+}
+
+init();
